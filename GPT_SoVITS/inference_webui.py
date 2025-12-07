@@ -17,10 +17,10 @@ from text.LangSegmenter import LangSegmenter
 
 version = model_version = "v2"
 
-gpt_path = os.environ.get("gpt_path", "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
-sovits_path = os.environ.get("sovits_path", "GPT_SoVITS/pretrained_models/v2Pro/s2Gv2ProPlus.pth")
-cnhubert_base_path = os.environ.get("cnhubert_base_path", "GPT_SoVITS/pretrained_models/chinese-hubert-base")
-bert_path = os.environ.get("bert_path", "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large")
+gpt_path = os.environ.get("gpt_path", "D:/gptsovitsmodels/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
+sovits_path = os.environ.get("sovits_path", "D:/gptsovitsmodels/v2Pro/s2Gv2ProPlus.pth")
+cnhubert_base_path = os.environ.get("cnhubert_base_path", "D:/gptsovitsmodels/chinese-hubert-base")
+bert_path = os.environ.get("bert_path", "D:/gptsovitsmodels/chinese-roberta-wwm-ext-large")
 
 if "_CUDA_VISIBLE_DEVICES" in os.environ:
     os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["_CUDA_VISIBLE_DEVICES"]
@@ -159,7 +159,8 @@ def change_sovits_weights(sovits_path, prompt_language=None, text_language=None)
         vq_model = vq_model.half().to(device)
     else:
         vq_model = vq_model.to(device)
-    print("loading sovits_%s" % model_version, vq_model.load_state_dict(dict_s2["weight"], strict=False))
+    vq_model.load_state_dict(dict_s2["weight"], strict=False)
+    print("loading sovits_%s" % model_version)
 
 try:
     change_sovits_weights(sovits_path)

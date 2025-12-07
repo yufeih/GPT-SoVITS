@@ -4,8 +4,6 @@ import soundfile as sf
 from GPT_SoVITS.inference_webui import get_tts_wav
 
 def synthesize(
-    GPT_model_path,
-    SoVITS_model_path,
     ref_audio_path,
     ref_text_path,
     ref_language,
@@ -41,8 +39,6 @@ def synthesize(
         print(f"Audio saved to {output_wav_path}")
 
 synthesize(
-    'GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt',
-    'GPT_SoVITS/pretrained_models/v2Pro/s2Gv2ProPlus.pth',
     'test.m4a',
     'test.txt',
     '中文',
