@@ -1,7 +1,7 @@
 import os
 import soundfile as sf
 
-from GPT_SoVITS.inference_webui import change_gpt_weights, change_sovits_weights, get_tts_wav
+from GPT_SoVITS.inference_webui import get_tts_wav
 
 def synthesize(
     GPT_model_path,
@@ -20,10 +20,6 @@ def synthesize(
     # Read target text
     with open(target_text_path, "r", encoding="utf-8") as file:
         target_text = file.read()
-
-    # Change model weights
-    change_gpt_weights(gpt_path=GPT_model_path)
-    change_sovits_weights(sovits_path=SoVITS_model_path)
 
     # Synthesize audio
     synthesis_result = get_tts_wav(

@@ -8,17 +8,15 @@
 """
 import os
 import json
-import logging
 import os
 import re
 import traceback
-import warnings
 
 import torch
 import torchaudio
 from text.LangSegmenter import LangSegmenter
 
-version = model_version = os.environ.get("version", "v2")
+version = model_version = "v2"
 
 from config import get_weights_names, name2gpt_path, name2sovits_path
 
@@ -30,22 +28,9 @@ path_sovits_v4 = pretrained_sovits_name["v4"]
 is_exist_s2gv3 = os.path.exists(path_sovits_v3)
 is_exist_s2gv4 = os.path.exists(path_sovits_v4)
 
-if os.path.exists("./weight.json"):
-    pass
-else:
-    with open("./weight.json", "w", encoding="utf-8") as file:
-        json.dump({"GPT": {}, "SoVITS": {}}, file)
 
-with open("./weight.json", "r", encoding="utf-8") as file:
-    weight_data = file.read()
-    weight_data = json.loads(weight_data)
-    gpt_path = os.environ.get("gpt_path", weight_data.get("GPT", {}).get(version, GPT_names[-1]))
-    sovits_path = os.environ.get("sovits_path", weight_data.get("SoVITS", {}).get(version, SoVITS_names[0]))
-    if isinstance(gpt_path, list):
-        gpt_path = gpt_path[0]
-    if isinstance(sovits_path, list):
-        sovits_path = sovits_path[0]
-
+gpt_path = os.environ.get("gpt_path", "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
+sovits_path = os.environ.get("sovits_path", "GPT_SoVITS/pretrained_models/v2Pro/s2Gv2ProPlus.pth")
 cnhubert_base_path = os.environ.get("cnhubert_base_path", "GPT_SoVITS/pretrained_models/chinese-hubert-base")
 bert_path = os.environ.get("bert_path", "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large")
 infer_ttswebui = os.environ.get("infer_ttswebui", 9872)
@@ -86,7 +71,6 @@ def set_seed(seed):
 from time import time as ttime
 
 from AR.models.t2s_lightning_module import Text2SemanticLightningModule
-from peft import LoraConfig, get_peft_model
 from text import cleaned_text_to_sequence
 from text.cleaner import clean_text
 
@@ -220,14 +204,6 @@ def change_sovits_weights(sovits_path, prompt_language=None, text_language=None)
             n_speakers=hps.data.n_speakers,
             **hps.model,
         )
-    else:
-        hps.model.version = model_version
-        vq_model = SynthesizerTrnV3(
-            hps.data.filter_length // 2 + 1,
-            hps.train.segment_size // hps.data.hop_length,
-            n_speakers=hps.data.n_speakers,
-            **hps.model,
-        )
     if "pretrained" not in sovits_path:
         try:
             del vq_model.enc_q
@@ -237,35 +213,8 @@ def change_sovits_weights(sovits_path, prompt_language=None, text_language=None)
         vq_model = vq_model.half().to(device)
     else:
         vq_model = vq_model.to(device)
-    vq_model.eval()
     if if_lora_v3 == False:
         print("loading sovits_%s" % model_version, vq_model.load_state_dict(dict_s2["weight"], strict=False))
-    else:
-        path_sovits = path_sovits_v3 if model_version == "v3" else path_sovits_v4
-        print(
-            "loading sovits_%spretrained_G" % model_version,
-            vq_model.load_state_dict(load_sovits_new(path_sovits)["weight"], strict=False),
-        )
-        lora_rank = dict_s2["lora_rank"]
-        lora_config = LoraConfig(
-            target_modules=["to_k", "to_q", "to_v", "to_out.0"],
-            r=lora_rank,
-            lora_alpha=lora_rank,
-            init_lora_weights=True,
-        )
-        vq_model.cfm = get_peft_model(vq_model.cfm, lora_config)
-        print("loading sovits_%s_lora%s" % (model_version, lora_rank))
-        vq_model.load_state_dict(dict_s2["weight"], strict=False)
-        vq_model.cfm = vq_model.cfm.merge_and_unload()
-        vq_model.eval()
-
-    with open("./weight.json") as f:
-        data = f.read()
-        data = json.loads(data)
-        data["SoVITS"][version] = sovits_path
-    with open("./weight.json", "w") as f:
-        f.write(json.dumps(data))
-
 
 try:
     change_sovits_weights(sovits_path)
@@ -286,15 +235,6 @@ def change_gpt_weights(gpt_path):
     if is_half == True:
         t2s_model = t2s_model.half()
     t2s_model = t2s_model.to(device)
-    t2s_model.eval()
-    # total = sum([param.nelement() for param in t2s_model.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
-    with open("./weight.json") as f:
-        data = f.read()
-        data = json.loads(data)
-        data["GPT"][version] = gpt_path
-    with open("./weight.json", "w") as f:
-        f.write(json.dumps(data))
 
 
 change_gpt_weights(gpt_path)
@@ -303,103 +243,15 @@ import torch
 
 now_dir = os.getcwd()
 
-
-def clean_hifigan_model():
-    global hifigan_model
-    if hifigan_model:
-        hifigan_model = hifigan_model.cpu()
-        hifigan_model = None
-        try:
-            torch.cuda.empty_cache()
-        except:
-            pass
-
-
-def clean_bigvgan_model():
-    global bigvgan_model
-    if bigvgan_model:
-        bigvgan_model = bigvgan_model.cpu()
-        bigvgan_model = None
-        try:
-            torch.cuda.empty_cache()
-        except:
-            pass
-
-
-def clean_sv_cn_model():
-    global sv_cn_model
-    if sv_cn_model:
-        sv_cn_model.embedding_model = sv_cn_model.embedding_model.cpu()
-        sv_cn_model = None
-        try:
-            torch.cuda.empty_cache()
-        except:
-            pass
-
-
-def init_bigvgan():
-    global bigvgan_model, hifigan_model, sv_cn_model
-    from BigVGAN import bigvgan
-
-    bigvgan_model = bigvgan.BigVGAN.from_pretrained(
-        "%s/GPT_SoVITS/pretrained_models/models--nvidia--bigvgan_v2_24khz_100band_256x" % (now_dir,),
-        use_cuda_kernel=False,
-    )  # if True, RuntimeError: Ninja is required to load C++ extensions
-    # remove weight norm in the model and set to eval mode
-    bigvgan_model.remove_weight_norm()
-    bigvgan_model = bigvgan_model.eval()
-    clean_hifigan_model()
-    clean_sv_cn_model()
-    if is_half == True:
-        bigvgan_model = bigvgan_model.half().to(device)
-    else:
-        bigvgan_model = bigvgan_model.to(device)
-
-
-def init_hifigan():
-    global hifigan_model, bigvgan_model, sv_cn_model
-    hifigan_model = Generator(
-        initial_channel=100,
-        resblock="1",
-        resblock_kernel_sizes=[3, 7, 11],
-        resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
-        upsample_rates=[10, 6, 2, 2, 2],
-        upsample_initial_channel=512,
-        upsample_kernel_sizes=[20, 12, 4, 4, 4],
-        gin_channels=0,
-        is_bias=True,
-    )
-    hifigan_model.eval()
-    hifigan_model.remove_weight_norm()
-    state_dict_g = torch.load(
-        "%s/GPT_SoVITS/pretrained_models/gsv-v4-pretrained/vocoder.pth" % (now_dir,),
-        map_location="cpu",
-        weights_only=False,
-    )
-    print("loading vocoder", hifigan_model.load_state_dict(state_dict_g))
-    clean_bigvgan_model()
-    clean_sv_cn_model()
-    if is_half == True:
-        hifigan_model = hifigan_model.half().to(device)
-    else:
-        hifigan_model = hifigan_model.to(device)
-
-
 from sv import SV
 
 
 def init_sv_cn():
     global hifigan_model, bigvgan_model, sv_cn_model
     sv_cn_model = SV(device, is_half)
-    clean_bigvgan_model()
-    clean_hifigan_model()
 
 
 bigvgan_model = hifigan_model = sv_cn_model = None
-if model_version == "v3":
-    init_bigvgan()
-if model_version == "v4":
-    init_hifigan()
 if model_version in {"v2Pro", "v2ProPlus"}:
     init_sv_cn()
 
@@ -628,19 +480,6 @@ def merge_short_text_in_array(texts, threshold):
 
 
 sr_model = None
-
-
-def audio_sr(audio, sr):
-    global sr_model
-    if sr_model == None:
-        from tools.audio_sr import AP_BWE
-
-        try:
-            sr_model = AP_BWE(device, DictToAttrRecursive)
-        except FileNotFoundError:
-            print("你没有下载超分模型的参数，因此不进行超分。如想超分请先参照教程把文件下载好")
-            return audio.cpu().detach().numpy(), sr
-    return sr_model(audio, sr)
 
 
 ##ref_wav_path+prompt_text+prompt_language+text(单个)+text_language+top_k+top_p+temperature
@@ -889,14 +728,7 @@ def get_tts_wav(
         opt_sr = 24000
     else:
         opt_sr = 48000  # v4
-    if if_sr == True and opt_sr == 24000:
-        print("音频超分中")
-        audio_opt, opt_sr = audio_sr(audio_opt.unsqueeze(0), opt_sr)
-        max_audio = np.abs(audio_opt).max()
-        if max_audio > 1:
-            audio_opt /= max_audio
-    else:
-        audio_opt = audio_opt.cpu().detach().numpy()
+    audio_opt = audio_opt.cpu().detach().numpy()
     yield opt_sr, (audio_opt * 32767).astype(np.int16)
 
 
