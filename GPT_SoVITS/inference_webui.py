@@ -7,7 +7,6 @@
 全部按日文识别
 """
 import os
-import json
 import os
 import re
 import traceback
@@ -18,19 +17,11 @@ from text.LangSegmenter import LangSegmenter
 
 version = model_version = "v2"
 
-from config import get_weights_names, name2gpt_path, name2sovits_path
-
-SoVITS_names, GPT_names = get_weights_names()
-
-
 gpt_path = os.environ.get("gpt_path", "GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
 sovits_path = os.environ.get("sovits_path", "GPT_SoVITS/pretrained_models/v2Pro/s2Gv2ProPlus.pth")
 cnhubert_base_path = os.environ.get("cnhubert_base_path", "GPT_SoVITS/pretrained_models/chinese-hubert-base")
 bert_path = os.environ.get("bert_path", "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large")
-infer_ttswebui = os.environ.get("infer_ttswebui", 9872)
-infer_ttswebui = int(infer_ttswebui)
-is_share = os.environ.get("is_share", "False")
-is_share = eval(is_share)
+
 if "_CUDA_VISIBLE_DEVICES" in os.environ:
     os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["_CUDA_VISIBLE_DEVICES"]
 is_half = eval(os.environ.get("is_half", "True")) and torch.cuda.is_available()
@@ -44,23 +35,7 @@ from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 cnhubert.cnhubert_base_path = cnhubert_base_path
 
-import random
-
-from GPT_SoVITS.module.models import Generator, SynthesizerTrn
-
-
-def set_seed(seed):
-    if seed == -1:
-        seed = random.randint(0, 1000000)
-    seed = int(seed)
-    random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-
-
-# set_seed(42)
+from GPT_SoVITS.module.models import SynthesizerTrn
 
 from time import time as ttime
 
@@ -150,8 +125,6 @@ from process_ckpt import get_sovits_version_from_path_fast, load_sovits_new
 
 
 def change_sovits_weights(sovits_path, prompt_language=None, text_language=None):
-    if "！" in sovits_path or "!" in sovits_path:
-        sovits_path = name2sovits_path[sovits_path]
     global vq_model, hps, version, model_version
     version, model_version, _ = get_sovits_version_from_path_fast(sovits_path)
     print(sovits_path, version, model_version)
@@ -195,8 +168,6 @@ except:
 
 
 def change_gpt_weights(gpt_path):
-    if "！" in gpt_path or "!" in gpt_path:
-        gpt_path = name2gpt_path[gpt_path]
     global hz, max_sec, t2s_model, config
     hz = 50
     dict_s1 = torch.load(gpt_path, map_location="cpu", weights_only=False)
