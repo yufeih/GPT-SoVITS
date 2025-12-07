@@ -1,12 +1,7 @@
-import argparse
 import os
 import soundfile as sf
 
-from tools.i18n.i18n import I18nAuto
 from GPT_SoVITS.inference_webui import change_gpt_weights, change_sovits_weights, get_tts_wav
-
-i18n = I18nAuto()
-
 
 def synthesize(
     GPT_model_path,
@@ -34,9 +29,9 @@ def synthesize(
     synthesis_result = get_tts_wav(
         ref_wav_path=ref_audio_path,
         prompt_text=ref_text,
-        prompt_language=i18n(ref_language),
+        prompt_language=ref_language,
         text=target_text,
-        text_language=i18n(target_language),
+        text_language=target_language,
         top_p=1,
         temperature=1,
     )
