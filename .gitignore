@@ -19,6 +19,10 @@ ref_audios
 tools/AP_BWE_main/24kto48k/*
 !tools/AP_BWE_main/24kto48k/readme.txt
 
+bin
+obj
+test_results
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
