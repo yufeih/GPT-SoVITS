@@ -1,7 +1,9 @@
 import os
-import soundfile as sf
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "GPT_SoVITS"))
 
 from GPT_SoVITS.inference_webui import get_tts_wav
+import soundfile as sf
 
 def synthesize(
     ref_audio_path,
@@ -39,7 +41,7 @@ def synthesize(
         print(f"Audio saved to {output_wav_path}")
 
 synthesize(
-    'test.m4a',
+    'test.wav',
     'test.txt',
     '中文',
     'target.txt',

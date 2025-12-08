@@ -7,7 +7,6 @@ import subprocess
 import sys
 import traceback
 
-import librosa
 import numpy as np
 import torch
 
@@ -173,12 +172,6 @@ def plot_alignment_to_numpy(alignment, info=None):
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
     return data
-
-
-def load_wav_to_torch(full_path):
-    data, sampling_rate = librosa.load(full_path, sr=None)
-    return torch.FloatTensor(data), sampling_rate
-
 
 def load_filepaths_and_text(filename, split="|"):
     with open(filename, encoding="utf-8") as f:
@@ -352,10 +345,3 @@ class HParams:
     def __repr__(self):
         return self.__dict__.__repr__()
 
-
-if __name__ == "__main__":
-    print(
-        load_wav_to_torch(
-            "/home/fish/wenetspeech/dataset_vq/Y0000022499_wHFSeHEx9CM/S00261.flac",
-        )
-    )

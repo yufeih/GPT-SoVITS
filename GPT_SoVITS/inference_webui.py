@@ -13,6 +13,7 @@ import traceback
 
 import torch
 import torchaudio
+import soundfile as sf
 from text.LangSegmenter import LangSegmenter
 
 version = model_version = "v2"
@@ -213,11 +214,14 @@ def resample(audio_tensor, sr0, sr1, device):
 def get_spepc(hps, filename, dtype, device, is_v2pro=False):
     # audio = load_audio(filename, int(hps.data.sampling_rate))
 
-    # audio, sampling_rate = librosa.load(filename, sr=int(hps.data.sampling_rate))
-    # audio = torch.FloatTensor(audio)
-
     sr1 = int(hps.data.sampling_rate)
-    audio, sr0 = torchaudio.load(filename)
+    # audio, sr0 = torchaudio.load(filename)
+    audio, sr0 = sf.read(filename)
+    if len(audio.shape) == 1:
+        audio = torch.from_numpy(audio).unsqueeze(0).float()
+    else:
+        audio = torch.from_numpy(audio).transpose(0, 1).float()
+
     if sr0 != sr1:
         audio = audio.to(device)
         if audio.shape[0] == 2:
@@ -363,7 +367,7 @@ def get_phones_and_bert(text, language, version, final=False):
     return phones, bert.to(dtype), norm_text
 
 
-from module.mel_processing import mel_spectrogram_torch, spectrogram_torch
+from module.mel_processing import spectrogram_torch
 
 spec_min = -12
 spec_max = 2
@@ -375,21 +379,6 @@ def norm_spec(x):
 
 def denorm_spec(x):
     return (x + 1) / 2 * (spec_max - spec_min) + spec_min
-
-
-mel_fn = lambda x: mel_spectrogram_torch(
-    x,
-    **{
-        "n_fft": 1024,
-        "win_size": 1024,
-        "hop_size": 256,
-        "num_mels": 100,
-        "sampling_rate": 24000,
-        "fmin": 0,
-        "fmax": None,
-        "center": False,
-    },
-)
 
 
 def merge_short_text_in_array(texts, threshold):
@@ -473,14 +462,22 @@ def get_tts_wav(
         zero_wav_torch = zero_wav_torch.to(device)
     if not ref_free:
         with torch.no_grad():
-            wav16k, sr = librosa.load(ref_wav_path, sr=16000)
-            if wav16k.shape[0] > 160000 or wav16k.shape[0] < 48000:
-                raise OSError("参考音频在3~10秒范围外，请更换！")
-            wav16k = torch.from_numpy(wav16k)
+            wav16k, sr = sf.read(ref_wav_path)
+            if wav16k.ndim == 1:
+                wav16k = torch.from_numpy(wav16k).unsqueeze(0)
+            else:
+                wav16k = torch.from_numpy(wav16k).transpose(0, 1)
             if is_half == True:
                 wav16k = wav16k.half().to(device)
             else:
-                wav16k = wav16k.to(device)
+                wav16k = wav16k.float().to(device)
+            if wav16k.shape[0] > 1:
+                wav16k = wav16k.mean(0, keepdim=True)
+            if sr != 16000:
+                wav16k = resample(wav16k, sr, 16000, device)
+            wav16k = wav16k.squeeze(0)
+            if wav16k.shape[0] > 160000 or wav16k.shape[0] < 48000:
+                raise OSError("参考音频在3~10秒范围外，请更换！")
             wav16k = torch.cat([wav16k, zero_wav_torch])
             ssl_content = ssl_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(1, 2)  # .float()
             codes = vq_model.extract_latent(ssl_content)

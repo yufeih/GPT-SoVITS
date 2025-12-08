@@ -95,12 +95,3 @@ def get_content(hmodel, wav_16k_tensor):
         feats = hmodel(wav_16k_tensor)
     return feats.transpose(1, 2)
 
-
-if __name__ == "__main__":
-    model = get_model()
-    src_path = "/Users/Shared/原音频2.wav"
-    wav_16k_tensor = utils.load_wav_to_torch_and_resample(src_path, 16000)
-    model = model
-    wav_16k_tensor = wav_16k_tensor
-    feats = get_content(model, wav_16k_tensor)
-    print(feats.shape)
