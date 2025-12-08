@@ -55,30 +55,6 @@ def predict(session, onnx_input: Dict[str, Any], labels: List[str]) -> Tuple[Lis
     return all_preds, all_confidences
 
 
-def download_and_decompress(model_dir: str = "G2PWModel/"):
-    if not os.path.exists(model_dir):
-        parent_directory = os.path.dirname(model_dir)
-        zip_dir = os.path.join(parent_directory, "G2PWModel_1.1.zip")
-        extract_dir = os.path.join(parent_directory, "G2PWModel_1.1")
-        extract_dir_new = os.path.join(parent_directory, "G2PWModel")
-        print("Downloading g2pw model...")
-        modelscope_url = "https://www.modelscope.cn/models/kamiorinn/g2pw/resolve/master/G2PWModel_1.1.zip"  # "https://paddlespeech.cdn.bcebos.com/Parakeet/released_models/g2p/G2PWModel_1.1.zip"
-        with requests.get(modelscope_url, stream=True) as r:
-            r.raise_for_status()
-            with open(zip_dir, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-
-        print("Extracting g2pw model...")
-        with zipfile.ZipFile(zip_dir, "r") as zip_ref:
-            zip_ref.extractall(parent_directory)
-
-        os.rename(extract_dir, extract_dir_new)
-
-    return model_dir
-
-
 class G2PWOnnxConverter:
     def __init__(
         self,
@@ -87,21 +63,21 @@ class G2PWOnnxConverter:
         model_source: str = None,
         enable_non_tradional_chinese: bool = False,
     ):
-        uncompress_path = download_and_decompress(model_dir)
+        uncompress_path = model_dir
 
         sess_options = onnxruntime.SessionOptions()
-        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
         sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
         sess_options.intra_op_num_threads = 2 if torch.cuda.is_available() else 0
         if "CUDAExecutionProvider" in onnxruntime.get_available_providers():
             self.session_g2pW = onnxruntime.InferenceSession(
-                os.path.join(uncompress_path, "g2pW.onnx"),
+                os.path.join(uncompress_path, "g2pW_fp16.onnx"),
                 sess_options=sess_options,
                 providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
             )
         else:
             self.session_g2pW = onnxruntime.InferenceSession(
-                os.path.join(uncompress_path, "g2pW.onnx"),
+                os.path.join(uncompress_path, "g2pW_fp16.onnx"),
                 sess_options=sess_options,
                 providers=["CPUExecutionProvider"],
             )

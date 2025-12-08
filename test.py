@@ -9,7 +9,6 @@ def synthesize(
     ref_audio_path,
     ref_text_path,
     ref_language,
-    target_text_path,
     target_language,
     output_path,
 ):
@@ -17,16 +16,17 @@ def synthesize(
     with open(ref_text_path, "r", encoding="utf-8") as file:
         ref_text = file.read()
 
-    # Read target text
-    with open(target_text_path, "r", encoding="utf-8") as file:
-        target_text = file.read()
-
     # Synthesize audio
     synthesis_result = get_tts_wav(
         ref_wav_path=ref_audio_path,
         prompt_text=ref_text,
         prompt_language=ref_language,
-        text=target_text,
+        text="嗨～欢迎回来呀！\
+我已经在小小的桌面上，等你很久啦～\
+今天也一起努力一下下，好不好？\
+如果累了呢……可以戳戳我，我会给你补充萌力♪\
+嗯哼～我会一直陪着你的，所以放心大胆去做事吧！\
+加油加油！我在这里给你悄悄打气～(≧▽≦)",
         text_language=target_language,
         top_p=1,
         temperature=1,
@@ -36,7 +36,7 @@ def synthesize(
 
     if result_list:
         last_sampling_rate, last_audio_data = result_list[-1]
-        output_wav_path = os.path.join(output_path, "output.wav")
+        output_wav_path = os.path.join(output_path, "output.mp3")
         sf.write(output_wav_path, last_audio_data, last_sampling_rate)
         print(f"Audio saved to {output_wav_path}")
 
@@ -44,7 +44,6 @@ synthesize(
     'test.wav',
     'test.txt',
     '中文',
-    'target.txt',
     '中文',
     '.',
 )

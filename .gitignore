@@ -1,4 +1,5 @@
-output.wav
+*.wav
+*.mp3
 .DS_Store
 .vscode
 __pycache__
