@@ -33,6 +33,7 @@ punctuation = set(["!", "?", "…", ",", ".", "-", " "])
 
 import librosa
 import numpy as np
+import io
 from feature_extractor import cnhubert
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
@@ -128,9 +129,9 @@ from process_ckpt import get_sovits_version_from_path_fast, load_sovits_new
 
 
 def change_sovits_weights(sovits_path, prompt_language=None, text_language=None):
-    global vq_model, hps, version, model_version
+    global vq_model, hps, version, model_version, ref_cache
+    ref_cache = {}
     version, model_version, _ = get_sovits_version_from_path_fast(sovits_path)
-    print(sovits_path, version, model_version)
     
     dict_s2 = load_sovits_new(sovits_path)
     hps = dict_s2["config"]
@@ -163,16 +164,13 @@ def change_sovits_weights(sovits_path, prompt_language=None, text_language=None)
     else:
         vq_model = vq_model.to(device)
     vq_model.load_state_dict(dict_s2["weight"], strict=False)
-    print("loading sovits_%s" % model_version)
 
-try:
-    change_sovits_weights(sovits_path)
-except:
-    pass
 
+change_sovits_weights(sovits_path)
 
 def change_gpt_weights(gpt_path):
-    global hz, max_sec, t2s_model, config
+    global hz, max_sec, t2s_model, config, ref_cache
+    ref_cache = {}
     hz = 50
     dict_s1 = torch.load(gpt_path, map_location="cpu", weights_only=False)
     config = dict_s1["config"]
@@ -213,12 +211,12 @@ def resample(audio_tensor, sr0, sr1, device):
     return resample_transform_dict[key](audio_tensor)
 
 
-def get_spepc(hps, filename, dtype, device, is_v2pro=False):
+def get_spepc(hps, ref_audio_fn, dtype, device, is_v2pro=False):
     # audio = load_audio(filename, int(hps.data.sampling_rate))
 
     sr1 = int(hps.data.sampling_rate)
     # audio, sr0 = torchaudio.load(filename)
-    audio, sr0 = sf.read(filename)
+    audio, sr0 = sf.read(io.BytesIO(ref_audio_fn()))
     if len(audio.shape) == 1:
         audio = torch.from_numpy(audio).unsqueeze(0).float()
     else:
@@ -347,8 +345,6 @@ def get_phones_and_bert(text, language, version, final=False):
                 # 因无法区别中日韩文汉字,以用户输入为准
                 langlist.append(language)
             textlist.append(tmp["text"])
-    print(textlist)
-    print(langlist)
     phones_list = []
     bert_list = []
     norm_text_list = []
@@ -407,10 +403,11 @@ sr_model = None
 ##ref_wav_path+prompt_text+prompt_language+text(单个)+text_language+top_k+top_p+temperature
 # cache_tokens={}#暂未实现清理机制
 cache = {}
+ref_cache = {}
 
 
 def get_tts_wav(
-    ref_wav_path,
+    ref_audio_fn,
     prompt_text,
     prompt_language,
     text,
@@ -422,24 +419,18 @@ def get_tts_wav(
     ref_free=False,
     speed=1,
     if_freeze=False,
-    inp_refs=None,
-    sample_steps=8,
-    if_sr=False,
     pause_second=0.3,
+    ref_id=None,
 ):
-    global cache
-    if ref_wav_path:
-        pass
-    else:
-        print("请上传参考音频")
-    if text:
-        pass
-    else:
-        print("请填入推理文本")
+    global cache, ref_cache
     t = []
     if prompt_text is None or len(prompt_text) == 0:
         ref_free = True
-    if_sr = False
+    
+    cached = {}
+    if ref_id is not None and ref_id in ref_cache:
+        cached = ref_cache[ref_id]
+
     t0 = ttime()
     prompt_language = dict_language[prompt_language]
     text_language = dict_language[text_language]
@@ -448,11 +439,8 @@ def get_tts_wav(
         prompt_text = prompt_text.strip("\n")
         if prompt_text[-1] not in splits:
             prompt_text += "。" if prompt_language != "en" else "."
-        print("实际输入的参考文本:", prompt_text)
     text = text.strip("\n")
-    # if (text[0] not in splits and len(get_first(text)) < 4): text = "。" + text if text_language != "en" else "." + text
 
-    print("实际输入的目标文本:", text)
     zero_wav = np.zeros(
         int(hps.data.sampling_rate * pause_second),
         dtype=np.float16 if is_half == True else np.float32,
@@ -463,28 +451,35 @@ def get_tts_wav(
     else:
         zero_wav_torch = zero_wav_torch.to(device)
     if not ref_free:
-        with torch.no_grad():
-            wav16k, sr = sf.read(ref_wav_path)
-            if wav16k.ndim == 1:
-                wav16k = torch.from_numpy(wav16k).unsqueeze(0)
-            else:
-                wav16k = torch.from_numpy(wav16k).transpose(0, 1)
-            if is_half == True:
-                wav16k = wav16k.half().to(device)
-            else:
-                wav16k = wav16k.float().to(device)
-            if wav16k.shape[0] > 1:
-                wav16k = wav16k.mean(0, keepdim=True)
-            if sr != 16000:
-                wav16k = resample(wav16k, sr, 16000, device)
-            wav16k = wav16k.squeeze(0)
-            if wav16k.shape[0] > 160000 or wav16k.shape[0] < 48000:
-                raise OSError("参考音频在3~10秒范围外，请更换！")
-            wav16k = torch.cat([wav16k, zero_wav_torch])
-            ssl_content = ssl_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(1, 2)  # .float()
-            codes = vq_model.extract_latent(ssl_content)
-            prompt_semantic = codes[0, 0]
+        if "prompt_semantic" in cached:
+            prompt_semantic = cached["prompt_semantic"]
             prompt = prompt_semantic.unsqueeze(0).to(device)
+        else:
+            with torch.no_grad():
+                wav16k, sr = sf.read(io.BytesIO(ref_audio_fn()))
+                if wav16k.ndim == 1:
+                    wav16k = torch.from_numpy(wav16k).unsqueeze(0)
+                else:
+                    wav16k = torch.from_numpy(wav16k).transpose(0, 1)
+                if is_half == True:
+                    wav16k = wav16k.half().to(device)
+                else:
+                    wav16k = wav16k.float().to(device)
+                if wav16k.shape[0] > 1:
+                    wav16k = wav16k.mean(0, keepdim=True)
+                if sr != 16000:
+                    wav16k = resample(wav16k, sr, 16000, device)
+                wav16k = wav16k.squeeze(0)
+                if wav16k.shape[0] > 160000 or wav16k.shape[0] < 48000:
+                    raise OSError("参考音频在3~10秒范围外，请更换！")
+                wav16k = torch.cat([wav16k, zero_wav_torch])
+                ssl_content = ssl_model.model(wav16k.unsqueeze(0))["last_hidden_state"].transpose(1, 2)  # .float()
+                codes = vq_model.extract_latent(ssl_content)
+                prompt_semantic = codes[0, 0]
+                prompt = prompt_semantic.unsqueeze(0).to(device)
+                if ref_id is not None:
+                    if ref_id not in ref_cache: ref_cache[ref_id] = {}
+                    ref_cache[ref_id]["prompt_semantic"] = prompt_semantic
 
     t1 = ttime()
     t.append(t1 - t0)
@@ -501,14 +496,19 @@ def get_tts_wav(
         text = cut5(text)
     while "\n\n" in text:
         text = text.replace("\n\n", "\n")
-    print("实际输入的目标文本(切句后):", text)
     texts = text.split("\n")
     texts = process_text(texts)
     texts = merge_short_text_in_array(texts, 5)
     audio_opt = []
     ###s2v3暂不支持ref_free
     if not ref_free:
-        phones1, bert1, norm_text1 = get_phones_and_bert(prompt_text, prompt_language, version)
+        if "phones1" in cached:
+            phones1, bert1, norm_text1 = cached["phones1"], cached["bert1"], cached["norm_text1"]
+        else:
+            phones1, bert1, norm_text1 = get_phones_and_bert(prompt_text, prompt_language, version)
+            if ref_id is not None:
+                if ref_id not in ref_cache: ref_cache[ref_id] = {}
+                ref_cache[ref_id].update({"phones1": phones1, "bert1": bert1, "norm_text1": norm_text1})
 
     for i_text, text in enumerate(texts):
         # 解决输入目标文本的空行导致报错的问题
@@ -516,9 +516,7 @@ def get_tts_wav(
             continue
         if text[-1] not in splits:
             text += "。" if text_language != "en" else "."
-        print("实际输入的目标文本(每句):", text)
         phones2, bert2, norm_text2 = get_phones_and_bert(text, text_language, version)
-        print("前端处理后的文本(每句):", norm_text2)
         if not ref_free:
             bert = torch.cat([bert1, bert2], 1)
             all_phoneme_ids = torch.LongTensor(phones1 + phones2).to(device).unsqueeze(0)
@@ -530,8 +528,6 @@ def get_tts_wav(
         all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(device)
 
         t2 = ttime()
-        # cache_key="%s-%s-%s-%s-%s-%s-%s-%s"%(ref_wav_path,prompt_text,prompt_language,text,text_language,top_k,top_p,temperature)
-        # print(cache.keys(),if_freeze)
         if i_text in cache and if_freeze == True:
             pred_semantic = cache[i_text]
         else:
@@ -556,20 +552,21 @@ def get_tts_wav(
             sv_emb = []
             if sv_cn_model == None:
                 init_sv_cn()
-        if inp_refs:
-            for path in inp_refs:
-                try:  #####这里加上提取sv的逻辑，要么一堆sv一堆refer，要么单个sv单个refer
-                    refer, audio_tensor = get_spepc(hps, path.name, dtype, device, is_v2pro)
-                    refers.append(refer)
-                    if is_v2pro:
-                        sv_emb.append(sv_cn_model.compute_embedding3(audio_tensor))
-                except:
-                    traceback.print_exc()
         if len(refers) == 0:
-            refers, audio_tensor = get_spepc(hps, ref_wav_path, dtype, device, is_v2pro)
-            refers = [refers]
-            if is_v2pro:
-                sv_emb = [sv_cn_model.compute_embedding3(audio_tensor)]
+            if "refers" in cached:
+                refers = cached["refers"]
+                if is_v2pro:
+                    sv_emb = cached["sv_emb"]
+            else:
+                refers, audio_tensor = get_spepc(hps, ref_audio_fn, dtype, device, is_v2pro)
+                refers = [refers]
+                if is_v2pro:
+                    sv_emb = [sv_cn_model.compute_embedding3(audio_tensor)]
+                if ref_id is not None:
+                    if ref_id not in ref_cache: ref_cache[ref_id] = {}
+                    ref_cache[ref_id]["refers"] = refers
+                    if is_v2pro:
+                        ref_cache[ref_id]["sv_emb"] = sv_emb
         if is_v2pro:
             audio = vq_model.decode(
                 pred_semantic, torch.LongTensor(phones2).to(device).unsqueeze(0), refers, speed=speed, sv_emb=sv_emb
@@ -586,7 +583,6 @@ def get_tts_wav(
         t4 = ttime()
         t.extend([t2 - t1, t3 - t2, t4 - t3])
         t1 = ttime()
-    print("%.3f\t%.3f\t%.3f\t%.3f" % (t[0], sum(t[1::3]), sum(t[2::3]), sum(t[3::3])))
     audio_opt = torch.cat(audio_opt, 0)  # np.concatenate
     opt_sr = 32000
     audio_opt = audio_opt.cpu().detach().numpy()
@@ -644,7 +640,6 @@ def cut2(inp):
             tmp_str = ""
     if tmp_str != "":
         opts.append(tmp_str)
-    # print(opts)
     if len(opts) > 1 and len(opts[-1]) < 50:  ##如果最后一个太短了，和前一个合一起
         opts[-2] = opts[-2] + opts[-1]
         opts = opts[:-1]
@@ -693,7 +688,7 @@ def cut5(inp):
 
 def custom_sort_key(s):
     # 使用正则表达式提取字符串中的数字部分和非数字部分
-    parts = re.split("(\d+)", s)
+    parts = re.split(r"(\d+)", s)
     # 将数字部分转换为整数，非数字部分保持不变
     parts = [int(part) if part.isdigit() else part for part in parts]
     return parts

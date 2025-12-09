@@ -18,7 +18,8 @@ def synthesize(
 
     # Synthesize audio
     synthesis_result = get_tts_wav(
-        ref_wav_path=ref_audio_path,
+        ref_audio_fn=lambda: open(ref_audio_path, "rb").read(),
+        ref_id="test_ref",
         prompt_text=ref_text,
         prompt_language=ref_language,
         text="嗨～欢迎回来呀！\
@@ -28,8 +29,6 @@ def synthesize(
 嗯哼～我会一直陪着你的，所以放心大胆去做事吧！\
 加油加油！我在这里给你悄悄打气～(≧▽≦)",
         text_language=target_language,
-        top_p=1,
-        temperature=1,
     )
 
     result_list = list(synthesis_result)
