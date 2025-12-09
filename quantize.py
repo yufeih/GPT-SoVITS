@@ -2,9 +2,11 @@ import onnx
 from onnxconverter_common import float16
 from onnxconverter_common import auto_convert_mixed_precision
 from onnxruntime.quantization import quantize_dynamic, QuantType
+import os
 
-model_fp32 = 'D:/gptsovitsmodels/g2pw/g2pW.onnx'
-model_quant = 'D:/gptsovitsmodels/g2pw/g2pW.quant.onnx'
+model_path = os.environ.get("model_path", "D:/gptsovitsmodels")
+model_fp32 = os.path.join(model_path, 'g2pw/g2pW.onnx')
+model_quant = os.path.join(model_path, 'g2pw/g2pW.quant.onnx')
 #quantize_dynamic(model_fp32, model_quant)
 
 g2pw_node_block_list = [
@@ -39,6 +41,6 @@ g2pw_node_block_list = [
     "Cast_1165",
 ]
 
-model = onnx.load("D:/gptsovitsmodels/g2pw/g2pW.onnx")
+model = onnx.load(model_fp32)
 model_fp16 = float16.convert_float_to_float16(model, keep_io_types=True, node_block_list=g2pw_node_block_list)
-onnx.save(model_fp16, "D:/gptsovitsmodels/g2pw/g2pW_fp16.onnx")
+onnx.save(model_fp16, os.path.join(model_path, "g2pw/g2pW_fp16.onnx"))

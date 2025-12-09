@@ -18,10 +18,12 @@ from text.LangSegmenter import LangSegmenter
 
 version = model_version = "v2"
 
-gpt_path = os.environ.get("gpt_path", "D:/gptsovitsmodels/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
-sovits_path = os.environ.get("sovits_path", "D:/gptsovitsmodels/v2Pro/s2Gv2ProPlus.pth")
-cnhubert_base_path = os.environ.get("cnhubert_base_path", "D:/gptsovitsmodels/chinese-hubert-base")
-bert_path = os.environ.get("bert_path", "D:/gptsovitsmodels/chinese-roberta-wwm-ext-large")
+model_path = os.environ.get("model_path", "D:/gptsovitsmodels")
+
+gpt_path = os.path.join(model_path, "gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
+sovits_path = os.path.join(model_path, "v2Pro/s2Gv2ProPlus.pth")
+cnhubert_base_path = os.path.join(model_path, "chinese-hubert-base")
+bert_path = os.path.join(model_path, "chinese-roberta-wwm-ext-large")
 
 if "_CUDA_VISIBLE_DEVICES" in os.environ:
     os.environ["CUDA_VISIBLE_DEVICES"] = os.environ["_CUDA_VISIBLE_DEVICES"]

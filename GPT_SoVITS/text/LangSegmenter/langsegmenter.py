@@ -3,7 +3,8 @@ import re
 # 更改fast_langdetect大模型位置
 import fast_langdetect
 import os
-cache_dir = os.environ.get("fast_langdetect_path", "D:/gptsovitsmodels/fast_langdetect")
+model_path = os.environ.get("model_path", "D:/gptsovitsmodels")
+cache_dir = os.path.join(model_path, "fast_langdetect")
 fast_langdetect.infer._default_detector = fast_langdetect.infer.LangDetector(fast_langdetect.infer.LangDetectConfig(cache_dir=cache_dir))
 
 

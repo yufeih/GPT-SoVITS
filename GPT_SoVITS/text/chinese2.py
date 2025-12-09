@@ -31,9 +31,10 @@ if is_g2pw:
     from text.g2pw import G2PWPinyin, correct_pronunciation
 
     parent_directory = os.path.dirname(current_file_path)
+    model_path = os.environ.get("model_path", "D:/gptsovitsmodels")
     g2pw = G2PWPinyin(
-        model_dir=os.environ.get("g2pw_path", "D:/gptsovitsmodels/g2pw"),
-        model_source=os.environ.get("bert_path", "D:/gptsovitsmodels/chinese-roberta-wwm-ext-large"),
+        model_dir=os.path.join(model_path, "g2pw"),
+        model_source=os.path.join(model_path, "chinese-roberta-wwm-ext-large"),
         v_to_u=False,
         neutral_tone_with_five=True,
     )
