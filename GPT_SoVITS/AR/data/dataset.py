@@ -109,8 +109,6 @@ class Text2SemanticDataset(Dataset):
             self.inited = True
             del self.semantic_data
             del self.phoneme_data
-        # self.tokenizer = AutoTokenizer.from_pretrained("hfl/chinese-roberta-wwm-ext-large")
-        # self.tokenizer = AutoTokenizer.from_pretrained("/data/docker/liujing04/bert-vits2/Bert-VITS2-master20231106/bert/chinese-roberta-wwm-ext-large")
 
     def init_batch(self):
         semantic_data_len = len(self.semantic_data)

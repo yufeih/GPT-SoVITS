@@ -41,7 +41,7 @@ def synthesize(
         print(f"Audio saved to {output_wav_path}")
 
 synthesize(
-    'test.wav',
+    'test.mp3',
     'test.txt',
     '中文',
     '中文',
