@@ -5,6 +5,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "GPT_SoVITS"))
 from GPT_SoVITS.inference_webui import get_tts_wav
 import soundfile as sf
 
+import numpy as np
+
 def synthesize(
     ref_audio_path,
     ref_text_path,
@@ -31,12 +33,16 @@ def synthesize(
         text_language=target_language,
     )
 
-    result_list = list(synthesis_result)
+    audio_chunks = []
+    sampling_rate = None
+    for sr, chunk in synthesis_result:
+        sampling_rate = sr
+        audio_chunks.append(chunk)
 
-    if result_list:
-        last_sampling_rate, last_audio_data = result_list[-1]
+    if audio_chunks and sampling_rate:
+        full_audio = np.concatenate(audio_chunks)
         output_wav_path = os.path.join(output_path, "output.mp3")
-        sf.write(output_wav_path, last_audio_data, last_sampling_rate)
+        sf.write(output_wav_path, full_audio, sampling_rate)
         print(f"Audio saved to {output_wav_path}")
 
 synthesize(

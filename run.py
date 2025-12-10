@@ -24,7 +24,6 @@ class TTSRequest(BaseModel):
 async def tts_endpoint(
     text: str = Query(...),
     voice: str = Query(...),
-    lang: str = Query(...),
     request: TTSRequest = Body(...)
 ):
     synthesis_result = get_tts_wav(
@@ -33,21 +32,51 @@ async def tts_endpoint(
         prompt_text=request.refText,
         prompt_language=request.refLang,
         text=text,
-        text_language=lang,
+        text_language='中文',
+        how_to_cut="按标点符号切"
     )
     
-    result_list = list(synthesis_result)
+    
+    def audio_generator():
+        out_buffer = io.BytesIO()
+        sf_file = None
+        read_pos = 0
 
-    if not result_list:
-         raise HTTPException(status_code=500, detail="TTS generation failed (no output)")
+        try:
+            for sampling_rate, audio_data in synthesis_result:
+                if sf_file is None:
+                    sf_file = sf.SoundFile(
+                        out_buffer, 
+                        mode='w', 
+                        samplerate=sampling_rate, 
+                        channels=1, 
+                        format='mp3'
+                    )
+                
+                sf_file.write(audio_data)
+                sf_file.flush()
 
-    last_sampling_rate, last_audio_data = result_list[-1]
+                # Read new data
+                current_pos = out_buffer.tell()
+                out_buffer.seek(read_pos)
+                new_data = out_buffer.read()
+                read_pos += len(new_data)
+                
+                # Reset to end for next write
+                out_buffer.seek(0, 2)
+                
+                if new_data:
+                    yield new_data
+        finally:
+            if sf_file:
+                sf_file.close()
+                # Yield any remaining data (footer/header updates)
+                out_buffer.seek(read_pos)
+                remaining = out_buffer.read()
+                if remaining:
+                    yield remaining
 
-    out_buffer = io.BytesIO()
-    sf.write(out_buffer, last_audio_data, last_sampling_rate, format='mp3')
-    out_buffer.seek(0)
-
-    return StreamingResponse(out_buffer, media_type="audio/mpeg")
+    return StreamingResponse(audio_generator(), media_type="audio/mpeg")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=58606)

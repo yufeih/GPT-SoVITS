@@ -499,7 +499,7 @@ def get_tts_wav(
     texts = text.split("\n")
     texts = process_text(texts)
     texts = merge_short_text_in_array(texts, 5)
-    audio_opt = []
+    opt_sr = 32000
     ###s2v3暂不支持ref_free
     if not ref_free:
         if "phones1" in cached:
@@ -578,15 +578,14 @@ def get_tts_wav(
         max_audio = torch.abs(audio).max()  # 简单防止16bit爆音
         if max_audio > 1:
             audio = audio / max_audio
-        audio_opt.append(audio)
-        audio_opt.append(zero_wav_torch)  # zero_wav
+        
+        # Immediate yield
+        audio_chunk = torch.cat([audio, zero_wav_torch], 0).cpu().detach().numpy()
+        yield opt_sr, (audio_chunk * 32767).astype(np.int16)
+
         t4 = ttime()
         t.extend([t2 - t1, t3 - t2, t4 - t3])
         t1 = ttime()
-    audio_opt = torch.cat(audio_opt, 0)  # np.concatenate
-    opt_sr = 32000
-    audio_opt = audio_opt.cpu().detach().numpy()
-    yield opt_sr, (audio_opt * 32767).astype(np.int16)
 
 
 def split(todo_text):
