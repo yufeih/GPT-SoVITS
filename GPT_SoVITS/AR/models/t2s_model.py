@@ -698,7 +698,7 @@ class Text2SemanticDecoder(nn.Module):
         y_list = [None] * y.shape[0]
         batch_idx_map = list(range(y.shape[0]))
         idx_list = [None] * y.shape[0]
-        for idx in tqdm(range(1500)):
+        for idx in range(1500):
             if idx == 0:
                 xy_dec, k_cache, v_cache = self.t2s_transformer.process_prompt(xy_pos, attn_mask, None)
             else:
@@ -884,7 +884,7 @@ class Text2SemanticDecoder(nn.Module):
 
         token_counter = 0
         curr_ptr = prefix_len
-        for idx in tqdm(range(1500)):
+        for idx in range(1500):
             token_counter+=1
             if xy_attn_mask is not None:
                 xy_dec, k_cache, v_cache = self.t2s_transformer.process_prompt(xy_pos, xy_attn_mask, None)

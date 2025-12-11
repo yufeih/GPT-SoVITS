@@ -208,6 +208,9 @@ def resample(audio_tensor, sr0, sr1, device):
     key = "%s-%s-%s" % (sr0, sr1, str(device))
     if key not in resample_transform_dict:
         resample_transform_dict[key] = torchaudio.transforms.Resample(sr0, sr1).to(device)
+    
+    if audio_tensor.dtype == torch.float16:
+        return resample_transform_dict[key](audio_tensor.float()).half()
     return resample_transform_dict[key](audio_tensor)
 
 

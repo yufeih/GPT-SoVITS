@@ -4,6 +4,8 @@ import uvicorn
 import base64
 import soundfile as sf
 import io
+import torch
+import onnxruntime
 from fastapi import FastAPI, Body, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -19,6 +21,17 @@ class TTSRequest(BaseModel):
     refAudio: str  # Base64 encoded audio
     refText: str
     refLang: str
+
+class CUDASupportResponse(BaseModel):
+    torch: bool
+    onnx: bool
+
+@app.get("/api/gptsovits/cuda")
+async def cuda_support_endpoint():
+    return CUDASupportResponse(
+        torch=torch.cuda.is_available(),
+        onnx="CUDAExecutionProvider" in onnxruntime.get_available_providers()
+    )
 
 @app.post("/api/gptsovits/tts")
 async def tts_endpoint(
