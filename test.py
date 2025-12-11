@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 sys.path.append(os.path.join(os.path.dirname(__file__), "GPT_SoVITS"))
 
 from GPT_SoVITS.inference_webui import get_tts_wav
@@ -7,7 +8,7 @@ import soundfile as sf
 
 import numpy as np
 
-def synthesize(
+async def synthesize(
     ref_audio_path,
     ref_text_path,
     ref_language,
@@ -35,7 +36,7 @@ def synthesize(
 
     audio_chunks = []
     sampling_rate = None
-    for sr, chunk in synthesis_result:
+    async for sr, chunk in synthesis_result:
         sampling_rate = sr
         audio_chunks.append(chunk)
 
@@ -45,11 +46,11 @@ def synthesize(
         sf.write(output_wav_path, full_audio, sampling_rate)
         print(f"Audio saved to {output_wav_path}")
 
-synthesize(
+asyncio.run(synthesize(
     'test.mp3',
     'test.txt',
     '中文',
     '中文',
     '.',
-)
+))
 

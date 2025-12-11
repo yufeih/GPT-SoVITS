@@ -6,9 +6,11 @@ import soundfile as sf
 import io
 import torch
 import onnxruntime
-from fastapi import FastAPI, Body, Query, HTTPException
+from fastapi import FastAPI, Body, Query, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import asyncio
+import json
 
 # Add GPT_SoVITS to path
 sys.path.append(os.path.join(os.path.dirname(__file__), "GPT_SoVITS"))
@@ -50,13 +52,13 @@ async def tts_endpoint(
     )
     
     
-    def audio_generator():
+    async def audio_generator():
         out_buffer = io.BytesIO()
         sf_file = None
         read_pos = 0
 
         try:
-            for sampling_rate, audio_data in synthesis_result:
+            async for sampling_rate, audio_data in synthesis_result:
                 if sf_file is None:
                     sf_file = sf.SoundFile(
                         out_buffer, 
@@ -90,6 +92,76 @@ async def tts_endpoint(
                     yield remaining
 
     return StreamingResponse(audio_generator(), media_type="audio/mpeg")
+
+@app.websocket("/api/gptsovits/tts/ws")
+async def tts_websocket(websocket: WebSocket):
+    await websocket.accept()
+    
+    tts_task = None
+    tts_queue = asyncio.Queue()
+    session_conf = {}
+
+    try:
+        while True:
+            message = await websocket.receive_json()
+            
+            if "session" in message:
+                if tts_task:
+                    continue
+                session_conf = message["session"]
+                
+                async def text_provider():
+                    while True:
+                        t = await tts_queue.get()
+                        if t is None: break
+                        yield t
+
+                # Extract config
+                ref_audio_b64 = session_conf.get("refAudio")
+                
+                def make_ref_provider(b64_data):
+                    return lambda: base64.b64decode(b64_data) if b64_data else None
+
+                voice = session_conf.get("voice")
+                ref_text = session_conf.get("refText")
+                ref_lang = session_conf.get("refLang")
+                text_lang = session_conf.get("textLang", "中文")
+
+                async def tts_runner(r_fn, v, rt, rl, tl):
+                    try:
+                        gen = get_tts_wav(
+                            ref_audio_fn=r_fn,
+                            ref_id=v,
+                            prompt_text=rt,
+                            prompt_language=rl,
+                            text=text_provider(),
+                            text_language=tl,
+                            how_to_cut="按标点符号切"
+                        )
+                        async for sr, audio_data in gen:
+                            await websocket.send_bytes(audio_data.tobytes())
+                        
+                        await websocket.send_json({"done": True})
+                    except Exception as e:
+                        await websocket.send_json({"error": str(e)})
+
+                tts_task = asyncio.create_task(tts_runner(
+                    make_ref_provider(ref_audio_b64),
+                    voice, 
+                    ref_text, 
+                    ref_lang, 
+                    text_lang
+                ))
+                
+            elif "text" in message:
+                await tts_queue.put(message["text"])
+
+            elif "done" in message:
+                await tts_queue.put(None)
+                
+    except WebSocketDisconnect:
+        if tts_task:
+            tts_task.cancel()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=58606)

@@ -409,7 +409,10 @@ cache = {}
 ref_cache = {}
 
 
-def get_tts_wav(
+
+import inspect
+
+async def get_tts_wav(
     ref_audio_fn,
     prompt_text,
     prompt_language,
@@ -442,8 +445,28 @@ def get_tts_wav(
         prompt_text = prompt_text.strip("\n")
         if prompt_text[-1] not in splits:
             prompt_text += "。" if prompt_language != "en" else "."
-    text = text.strip("\n")
+    
+    # Determine if text is a string or an async generator
+    is_streaming = inspect.isasyncgen(text)
 
+    if not is_streaming:
+        text = text.strip("\n")
+        if how_to_cut == "凑四句一切":
+            text = cut1(text)
+        elif how_to_cut == "凑50字一切":
+            text = cut2(text)
+        elif how_to_cut == "按中文句号。切":
+            text = cut3(text)
+        elif how_to_cut == "按英文句号.切":
+            text = cut4(text)
+        elif how_to_cut == "按标点符号切":
+            text = cut5(text)
+        while "\n\n" in text:
+            text = text.replace("\n\n", "\n")
+        texts = text.split("\n")
+        texts = process_text(texts)
+        texts = merge_short_text_in_array(texts, 5)
+    
     zero_wav = np.zeros(
         int(hps.data.sampling_rate * pause_second),
         dtype=np.float16 if is_half == True else np.float32,
@@ -487,21 +510,6 @@ def get_tts_wav(
     t1 = ttime()
     t.append(t1 - t0)
 
-    if how_to_cut == "凑四句一切":
-        text = cut1(text)
-    elif how_to_cut == "凑50字一切":
-        text = cut2(text)
-    elif how_to_cut == "按中文句号。切":
-        text = cut3(text)
-    elif how_to_cut == "按英文句号.切":
-        text = cut4(text)
-    elif how_to_cut == "按标点符号切":
-        text = cut5(text)
-    while "\n\n" in text:
-        text = text.replace("\n\n", "\n")
-    texts = text.split("\n")
-    texts = process_text(texts)
-    texts = merge_short_text_in_array(texts, 5)
     opt_sr = 32000
     ###s2v3暂不支持ref_free
     if not ref_free:
@@ -513,7 +521,22 @@ def get_tts_wav(
                 if ref_id not in ref_cache: ref_cache[ref_id] = {}
                 ref_cache[ref_id].update({"phones1": phones1, "bert1": bert1, "norm_text1": norm_text1})
 
-    for i_text, text in enumerate(texts):
+    async def _text_generator():
+        if is_streaming:
+            async for chunk in text:
+                yield chunk
+        else:
+            for chunk in texts:
+                yield chunk
+
+    # Iteration counter, used for cache indexing only if needed (kept from original)
+    # The original was enumerate(texts), so we need an index.
+    i_text = -1
+    
+    async for text_chunk in _text_generator():
+        i_text += 1
+        text = text_chunk # shadow outer text variable, that's fine
+        
         # 解决输入目标文本的空行导致报错的问题
         if len(text.strip()) == 0:
             continue
@@ -531,6 +554,7 @@ def get_tts_wav(
         all_phoneme_len = torch.tensor([all_phoneme_ids.shape[-1]]).to(device)
 
         t2 = ttime()
+        # cache uses i_text as key. If streaming, i_text increments monotonically.
         if i_text in cache and if_freeze == True:
             pred_semantic = cache[i_text]
         else:
