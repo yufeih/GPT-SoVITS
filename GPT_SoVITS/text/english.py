@@ -4,6 +4,10 @@ import re
 import wordsegment
 from g2p_en import G2p
 
+import nltk
+
+nltk.data.path.append(os.path.join(os.path.dirname(__file__), "nltk_data"))
+
 from text.symbols import punctuation
 
 from text.symbols2 import symbols

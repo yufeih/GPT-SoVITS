@@ -25,7 +25,7 @@ async def synthesize(
         ref_id="test_ref",
         prompt_text=ref_text,
         prompt_language=ref_language,
-        text="嗨～欢迎回来呀！\
+        text="Hello～欢迎回来呀！\
 我已经在小小的桌面上，等你很久啦～\
 今天也一起努力一下下，好不好？\
 如果累了呢……可以戳戳我，我会给你补充萌力♪\
