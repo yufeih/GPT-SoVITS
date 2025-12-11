@@ -138,8 +138,43 @@ async def tts_websocket(websocket: WebSocket):
                             text_language=tl,
                             how_to_cut="按标点符号切"
                         )
-                        async for sr, audio_data in gen:
-                            await websocket.send_bytes(audio_data.tobytes())
+                        
+                        out_buffer = io.BytesIO()
+                        sf_file = None
+                        read_pos = 0
+
+                        try:
+                            async for sr, audio_data in gen:
+                                if sf_file is None:
+                                    sf_file = sf.SoundFile(
+                                        out_buffer, 
+                                        mode='w', 
+                                        samplerate=sr, 
+                                        channels=1, 
+                                        format='mp3'
+                                    )
+                                
+                                sf_file.write(audio_data)
+                                sf_file.flush()
+
+                                # Read new data
+                                out_buffer.seek(read_pos)
+                                new_data = out_buffer.read()
+                                read_pos += len(new_data)
+                                
+                                # Reset to end for next write
+                                out_buffer.seek(0, 2)
+                                
+                                if new_data:
+                                    await websocket.send_bytes(new_data)
+                        finally:
+                            if sf_file:
+                                sf_file.close()
+                                # Yield any remaining data (footer/header updates)
+                                out_buffer.seek(read_pos)
+                                remaining = out_buffer.read()
+                                if remaining:
+                                    await websocket.send_bytes(remaining)
                         
                         await websocket.send_json({"done": True})
                     except Exception as e:
