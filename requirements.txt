@@ -2,7 +2,6 @@
 --no-binary=opencc
 
 torch
-torchvision
 torchaudio
 numpy<2.0
 fast_langdetect
@@ -16,3 +15,7 @@ onnxruntime
 opencc
 soundfile
 einops
+pyinstaller
+websockets
+g2p_en
+wordsegment

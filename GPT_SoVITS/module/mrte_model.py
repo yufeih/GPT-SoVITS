@@ -154,7 +154,6 @@ class WN(torch.nn.Module):
             remove_weight_norm(l)
 
 
-@torch.jit.script
 def fused_add_tanh_sigmoid_multiply(input, n_channels):
     n_channels_int = n_channels[0]
     t_act = torch.tanh(input[:, :n_channels_int, :])

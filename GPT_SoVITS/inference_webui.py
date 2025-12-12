@@ -39,7 +39,7 @@ from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 cnhubert.cnhubert_base_path = cnhubert_base_path
 
-from GPT_SoVITS.module.models import SynthesizerTrn
+from module.models import SynthesizerTrn
 
 from time import time as ttime
 

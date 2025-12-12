@@ -1,9 +1,8 @@
 import os
 import sys
 import asyncio
-sys.path.append(os.path.join(os.path.dirname(__file__), "GPT_SoVITS"))
 
-from GPT_SoVITS.inference_webui import get_tts_wav
+from inference_webui import get_tts_wav
 import soundfile as sf
 
 import numpy as np

@@ -70,7 +70,6 @@ def scaled_dot_product_attention(
     return attn_weight @ value
 
 
-@torch.jit.script
 class T2SMLP:
     def __init__(self, w1, b1, w2, b2):
         self.w1 = w1
@@ -84,7 +83,6 @@ class T2SMLP:
         return x
 
 
-@torch.jit.script
 class T2SBlock:
     def __init__(
         self,
@@ -221,7 +219,6 @@ class T2SBlock:
         return x, k_cache, v_cache
 
 
-@torch.jit.script
 class T2STransformer:
     def __init__(self, num_blocks: int, blocks: List[T2SBlock]):
         self.num_blocks: int = num_blocks

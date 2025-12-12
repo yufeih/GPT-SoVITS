@@ -5,8 +5,8 @@ import torch
 sys.path.append(f"{os.getcwd()}/GPT_SoVITS/eres2net")
 model_path = os.environ.get("model_path", "D:/gptsovitsmodels")
 sv_path = os.path.join(model_path, "sv/pretrained_eres2netv2w24s4ep4.ckpt")
-from ERes2NetV2 import ERes2NetV2
-import kaldi as Kaldi
+from eres2net.ERes2NetV2 import ERes2NetV2
+import eres2net.kaldi as Kaldi
 
 
 class SV:

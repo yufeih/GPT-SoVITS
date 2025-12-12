@@ -12,10 +12,7 @@ from pydantic import BaseModel
 import asyncio
 import json
 
-# Add GPT_SoVITS to path
-sys.path.append(os.path.join(os.path.dirname(__file__), "GPT_SoVITS"))
-
-from GPT_SoVITS.inference_webui import get_tts_wav
+from inference_webui import get_tts_wav
 
 app = FastAPI()
 
@@ -178,6 +175,7 @@ async def tts_websocket(websocket: WebSocket):
                         
                         await websocket.send_json({"done": True})
                     except Exception as e:
+                        print(f"error: {e}")
                         await websocket.send_json({"error": str(e)})
 
                 tts_task = asyncio.create_task(tts_runner(
