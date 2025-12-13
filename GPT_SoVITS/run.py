@@ -6,6 +6,7 @@ import soundfile as sf
 import io
 import torch
 import onnxruntime
+import traceback
 from fastapi import FastAPI, Body, Query, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -175,7 +176,7 @@ async def tts_websocket(websocket: WebSocket):
                         
                         await websocket.send_json({"done": True})
                     except Exception as e:
-                        print(f"error: {e}")
+                        traceback.print_exc()
                         await websocket.send_json({"error": str(e)})
 
                 tts_task = asyncio.create_task(tts_runner(

@@ -2,7 +2,6 @@
 """Initialize modules for espnet2 neural networks."""
 
 import torch
-from typeguard import check_argument_types
 
 
 def initialize(model: torch.nn.Module, init: str):
@@ -17,7 +16,6 @@ def initialize(model: torch.nn.Module, init: str):
         model: Target.
         init: Method of initialization.
     """
-    assert check_argument_types()
     print("init with", init)
 
     # weight init
