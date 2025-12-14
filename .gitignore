@@ -1,5 +1,6 @@
 *.wav
 *.mp3
+bin
 .DS_Store
 .vscode
 __pycache__

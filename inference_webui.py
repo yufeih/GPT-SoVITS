@@ -31,7 +31,6 @@ is_half = eval(os.environ.get("is_half", "True")) and torch.cuda.is_available()
 # is_half=False
 punctuation = set(["!", "?", "…", ",", ".", "-", " "])
 
-import librosa
 import numpy as np
 import io
 from feature_extractor import cnhubert
