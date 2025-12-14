@@ -18,7 +18,7 @@ from text.LangSegmenter import LangSegmenter
 
 version = model_version = "v2"
 
-model_path = os.environ.get("model_path", "D:/gptsovitsmodels")
+model_path = os.environ.get("model_path", "pretrained_models")
 
 gpt_path = os.path.join(model_path, "gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt")
 sovits_path = os.path.join(model_path, "v2Pro/s2Gv2ProPlus.pth")

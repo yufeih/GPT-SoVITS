@@ -9,20 +9,14 @@ import numpy as np
 
 async def synthesize(
     ref_audio_path,
-    ref_text_path,
     ref_language,
     target_language,
     output_path,
 ):
-    # Read reference text
-    with open(ref_text_path, "r", encoding="utf-8") as file:
-        ref_text = file.read()
-
-    # Synthesize audio
     synthesis_result = get_tts_wav(
         ref_audio_fn=lambda: open(ref_audio_path, "rb").read(),
         ref_id="test_ref",
-        prompt_text=ref_text,
+        prompt_text="我现在在录一个3到10秒钟的音频，这个音频时间不能太长，不然他就报错真是的",
         prompt_language=ref_language,
         text="Hello～欢迎回来呀！\
 我已经在小小的桌面上，等你很久啦～\
@@ -47,7 +41,6 @@ async def synthesize(
 
 asyncio.run(synthesize(
     'test.mp3',
-    'test.txt',
     '中文',
     '中文',
     '.',
