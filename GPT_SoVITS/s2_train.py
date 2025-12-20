@@ -47,25 +47,15 @@ torch.set_float32_matmul_precision("medium")  # 最低精度但最快（也就�
 # from config import pretrained_s2G,pretrained_s2D
 global_step = 0
 
-device = "cpu"  # cuda以外的设备，等mps优化后加入
+device = "cuda" # "cpu"  # cuda以外的设备，等mps优化后加入
 
 
 def main():
-    if torch.cuda.is_available():
-        n_gpus = torch.cuda.device_count()
-    else:
-        n_gpus = 1
+    n_gpus = 1
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(randint(20000, 55555))
 
-    mp.spawn(
-        run,
-        nprocs=n_gpus,
-        args=(
-            n_gpus,
-            hps,
-        ),
-    )
+    run(0, 1, hps)
 
 
 def run(rank, n_gpus, hps):
@@ -77,12 +67,12 @@ def run(rank, n_gpus, hps):
         writer = SummaryWriter(log_dir=hps.s2_ckpt_dir)
         writer_eval = SummaryWriter(log_dir=os.path.join(hps.s2_ckpt_dir, "eval"))
 
-    dist.init_process_group(
-        backend="gloo" if os.name == "nt" or not torch.cuda.is_available() else "nccl",
-        init_method="env://?use_libuv=False",
-        world_size=n_gpus,
-        rank=rank,
-    )
+    # dist.init_process_group(
+    #     backend="gloo" if os.name == "nt" or not torch.cuda.is_available() else "nccl",
+    #     init_method="env://?use_libuv=False",
+    #     world_size=n_gpus,
+    #     rank=rank,
+    # )
     torch.manual_seed(hps.train.seed)
     if torch.cuda.is_available():
         torch.cuda.set_device(rank)
@@ -197,8 +187,10 @@ def run(rank, n_gpus, hps):
         eps=hps.train.eps,
     )
     if torch.cuda.is_available():
-        net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
-        net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
+        net_g = net_g.to(device)
+        net_d = net_d.to(device)
+        # net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
+        # net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
     else:
         net_g = net_g.to(device)
         net_d = net_d.to(device)
@@ -234,12 +226,7 @@ def run(rank, n_gpus, hps):
                 logger.info("loaded pretrained %s" % hps.train.pretrained_s2G)
             print(
                 "loaded pretrained %s" % hps.train.pretrained_s2G,
-                net_g.module.load_state_dict(
-                    torch.load(hps.train.pretrained_s2G, map_location="cpu", weights_only=False)["weight"],
-                    strict=False,
-                )
-                if torch.cuda.is_available()
-                else net_g.load_state_dict(
+                net_g.load_state_dict(
                     torch.load(hps.train.pretrained_s2G, map_location="cpu", weights_only=False)["weight"],
                     strict=False,
                 ),
@@ -253,12 +240,8 @@ def run(rank, n_gpus, hps):
                 logger.info("loaded pretrained %s" % hps.train.pretrained_s2D)
             print(
                 "loaded pretrained %s" % hps.train.pretrained_s2D,
-                net_d.module.load_state_dict(
+                net_d.load_state_dict(
                     torch.load(hps.train.pretrained_s2D, map_location="cpu", weights_only=False)["weight"], strict=False
-                )
-                if torch.cuda.is_available()
-                else net_d.load_state_dict(
-                    torch.load(hps.train.pretrained_s2D, map_location="cpu", weights_only=False)["weight"],
                 ),
             )
 
@@ -608,16 +591,7 @@ def evaluate(hps, generator, eval_loader, writer_eval):
                 text, text_lengths = text.to(device), text_lengths.to(device)
             for test in [0, 1]:
                 y_hat, mask, *_ = (
-                    generator.module.infer(
-                        ssl,
-                        spec,
-                        spec_lengths,
-                        text,
-                        text_lengths,
-                        test=test,
-                    )
-                    if torch.cuda.is_available()
-                    else generator.infer(
+                    generator.infer(
                         ssl,
                         spec,
                         spec_lengths,
